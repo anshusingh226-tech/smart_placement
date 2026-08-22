@@ -3,123 +3,167 @@ import { useState } from 'react'
 function UserManagement() {
   const [activeTab, setActiveTab] = useState('students')
 
-  const students = []
-  const placementOfficers = []
-
-  const users =
-    activeTab === 'students' ? students : placementOfficers
-
   return (
-    <div className="p-6 md:p-8">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-800">
-          User Management
-        </h1>
+    <div className="min-h-screen bg-slate-50 p-6 md:p-8">
 
-        <p className="mt-2 text-gray-600">
-          Manage students and placement officers.
-        </p>
-      </div>
+      {/* Header */}
+      <div className="mb-8 flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+        <div>
+          <p className="mb-2 text-sm font-medium text-blue-600">
+            Admin Panel
+          </p>
 
-      {/* Tabs */}
-      <div className="mt-8 border-b border-gray-200">
-        <div className="flex gap-8">
-          <button
-            type="button"
-            onClick={() => setActiveTab('students')}
-            className={`border-b-2 px-1 pb-3 text-sm font-medium ${
-              activeTab === 'students'
-                ? 'border-slate-900 text-slate-900'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Students
-          </button>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900 md:text-4xl">
+            User Management 👥
+          </h1>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab('officers')}
-            className={`border-b-2 px-1 pb-3 text-sm font-medium ${
-              activeTab === 'officers'
-                ? 'border-slate-900 text-slate-900'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Placement Officers
-          </button>
+          <p className="mt-2 text-slate-500">
+            Manage students and placement officers.
+          </p>
         </div>
-      </div>
 
-      {/* Search and Create */}
-      <div className="mt-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <input
-          type="text"
-          placeholder={`Search ${activeTab === 'students' ? 'students' : 'placement officers'}...`}
-          className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-slate-900 md:max-w-md"
-        />
-
+        {/* Create User */}
         <button
           type="button"
-          className="rounded-lg bg-slate-900 px-5 py-3 text-sm font-medium text-white hover:bg-slate-800"
+          className="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
         >
           + Create User
         </button>
       </div>
 
-      {/* User table */}
-      <div className="mt-6 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[700px] text-left text-sm">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-4 font-semibold text-gray-700">
-                  Name
-                </th>
+      {/* Main Card */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
 
-                <th className="px-6 py-4 font-semibold text-gray-700">
-                  Email
-                </th>
+        {/* Tabs */}
+        <div className="mb-6 border-b border-slate-200">
+          <div className="flex gap-8">
 
-                <th className="px-6 py-4 font-semibold text-gray-700">
-                  Status
-                </th>
+            <button
+              type="button"
+              onClick={() => setActiveTab('students')}
+              className={`border-b-2 pb-3 text-sm font-semibold transition ${
+                activeTab === 'students'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              🎓 Students
+            </button>
 
-                <th className="px-6 py-4 font-semibold text-gray-700">
-                  Actions
-                </th>
-              </tr>
-            </thead>
+            <button
+              type="button"
+              onClick={() => setActiveTab('officers')}
+              className={`border-b-2 pb-3 text-sm font-semibold transition ${
+                activeTab === 'officers'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              🧑‍💼 Placement Officers
+            </button>
 
-            <tbody>
-              {users.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan="4"
-                    className="px-6 py-12 text-center text-gray-500"
-                  >
-                    No {activeTab === 'students' ? 'students' : 'placement officers'} found.
-                  </td>
-                </tr>
-              ) : (
-                users.map((user) => (
-                  <tr key={user.id} className="border-t border-gray-100">
-                    <td className="px-6 py-4">{user.name}</td>
-                    <td className="px-6 py-4">{user.email}</td>
-                    <td className="px-6 py-4">{user.status}</td>
-                    <td className="px-6 py-4">
-                      <div className="flex gap-2">
-                        <button type="button">Edit</button>
-                        <button type="button">Delete</button>
-                        <button type="button">Reset Password</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+          </div>
         </div>
+
+        {/* Search */}
+        <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+
+          <div className="relative w-full md:max-w-md">
+            <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+              🔍
+            </span>
+
+            <input
+              type="text"
+              placeholder={
+                activeTab === 'students'
+                  ? 'Search students...'
+                  : 'Search placement officers...'
+              }
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-11 pr-4 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
+            />
+          </div>
+
+          <p className="text-sm text-slate-400">
+            Data will appear when connected to the backend.
+          </p>
+
+        </div>
+
+        {/* Students */}
+        {activeTab === 'students' && (
+          <div className="overflow-hidden rounded-xl border border-slate-200">
+
+            <div className="grid grid-cols-4 bg-slate-50 px-5 py-4 text-xs font-semibold uppercase tracking-wide text-slate-400">
+              <span>Name</span>
+              <span>Email</span>
+              <span>Status</span>
+              <span>Actions</span>
+            </div>
+
+            <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 text-3xl">
+                🎓
+              </div>
+
+              <h2 className="mt-4 text-lg font-semibold text-slate-800">
+                No students available
+              </h2>
+
+              <p className="mt-2 max-w-md text-sm text-slate-500">
+                Student records will appear here once they are loaded from the backend.
+              </p>
+
+              <button
+                type="button"
+                className="mt-5 rounded-lg bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100"
+              >
+                + Add Student
+              </button>
+
+            </div>
+          </div>
+        )}
+
+        {/* Placement Officers */}
+        {activeTab === 'officers' && (
+          <div className="overflow-hidden rounded-xl border border-slate-200">
+
+            <div className="grid grid-cols-4 bg-slate-50 px-5 py-4 text-xs font-semibold uppercase tracking-wide text-slate-400">
+              <span>Name</span>
+              <span>Email</span>
+              <span>Status</span>
+              <span>Actions</span>
+            </div>
+
+            <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-purple-50 text-3xl">
+                🧑‍💼
+              </div>
+
+              <h2 className="mt-4 text-lg font-semibold text-slate-800">
+                No placement officers available
+              </h2>
+
+              <p className="mt-2 max-w-md text-sm text-slate-500">
+                Placement officer records will appear here once they are loaded from the backend.
+              </p>
+
+              <button
+                type="button"
+                className="mt-5 rounded-lg bg-purple-50 px-4 py-2 text-sm font-semibold text-purple-700 hover:bg-purple-100"
+              >
+                + Add Placement Officer
+              </button>
+
+            </div>
+          </div>
+        )}
+
       </div>
+
     </div>
   )
 }
