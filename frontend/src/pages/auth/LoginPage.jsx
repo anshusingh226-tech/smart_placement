@@ -7,10 +7,12 @@ function LoginPage() {
 
   const [step, setStep] = useState("landing");
   const [role, setRole] = useState(null);
+
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   });
+
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -20,7 +22,7 @@ function LoginPage() {
     setLoading(true);
 
     try {
-      const { error: loginError } =
+      const { data, error: loginError } =
         await supabase.auth.signInWithPassword({
           email: formData.email,
           password: formData.password,
@@ -30,14 +32,30 @@ function LoginPage() {
         throw loginError;
       }
 
-      if (role === "student") {
-        localStorage.setItem("userRole", "student");
+      const user = data.user;
+      const userRole = user.user_metadata?.role;
+
+      if (!userRole) {
+        throw new Error("Your account does not have a role assigned.");
+      }
+
+      localStorage.setItem("userRole", userRole);
+
+      if (userRole === "student") {
         navigate("/student");
+      } else if (userRole === "admin") {
+        navigate("/admin");
+      } else if (
+        userRole === "placement-officer" ||
+        userRole === "recruiter"
+      ) {
+        navigate("/placement-officer");
       } else {
-        setError(`${role} portal is not available yet.`);
+        throw new Error("Invalid user role.");
       }
     } catch (err) {
       console.error("Login error:", err);
+
       setError(
         err.message ||
           "Login failed. Please check your email and password."
@@ -46,6 +64,8 @@ function LoginPage() {
       setLoading(false);
     }
   };
+
+  // ==================== LANDING PAGE ====================
 
   if (step === "landing") {
     return (
@@ -64,7 +84,10 @@ function LoginPage() {
         </p>
 
         <button
-          onClick={() => setStep("role")}
+          onClick={() => {
+            setError("");
+            setStep("role");
+          }}
           className="rounded-xl bg-blue-600 text-white font-semibold px-8 py-3 shadow-sm hover:bg-blue-700 transition mb-16"
         >
           Login / Sign Up
@@ -117,11 +140,12 @@ function LoginPage() {
     );
   }
 
+  // ==================== ROLE SELECTION ====================
+
   if (step === "role") {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
         <div className="w-full max-w-md text-center">
-
           <button
             onClick={() => setStep("landing")}
             className="mb-6 text-sm font-medium text-blue-600 hover:text-blue-800"
@@ -138,10 +162,12 @@ function LoginPage() {
           </p>
 
           <div className="space-y-3">
+            {/* STUDENT */}
 
             <button
               onClick={() => {
                 setRole("student");
+                setError("");
                 setStep("form");
               }}
               className="w-full rounded-2xl border border-slate-200 bg-white px-6 py-4 text-left shadow-sm hover:shadow-md transition"
@@ -155,25 +181,31 @@ function LoginPage() {
               </p>
             </button>
 
+            {/* PLACEMENT OFFICER */}
+
             <button
               onClick={() => {
-                setRole("recruiter");
+                setRole("placement-officer");
+                setError("");
                 setStep("form");
               }}
               className="w-full rounded-2xl border border-slate-200 bg-white px-6 py-4 text-left shadow-sm hover:shadow-md transition"
             >
               <p className="font-semibold text-slate-900">
-                💼 Recruiter
+                💼 Placement Officer
               </p>
 
               <p className="text-sm text-slate-500">
-                Post opportunities and review candidates
+                Manage companies, jobs, and applications
               </p>
             </button>
+
+            {/* ADMIN */}
 
             <button
               onClick={() => {
                 setRole("admin");
+                setError("");
                 setStep("form");
               }}
               className="w-full rounded-2xl border border-slate-200 bg-white px-6 py-4 text-left shadow-sm hover:shadow-md transition"
@@ -186,28 +218,33 @@ function LoginPage() {
                 Manage users, skills, companies, and reports
               </p>
             </button>
-
           </div>
         </div>
       </div>
     );
   }
 
+  // ==================== LOGIN FORM ====================
+
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
       <div className="w-full max-w-md">
-
         <div className="mb-8 text-center">
-
           <button
-            onClick={() => setStep("role")}
+            onClick={() => {
+              setError("");
+              setStep("role");
+            }}
             className="mb-4 text-sm font-medium text-blue-600 hover:text-blue-800"
           >
             ← Back
           </button>
 
-          <p className="mb-2 text-sm font-medium text-blue-600 capitalize">
-            {role} Portal
+          <p className="mb-2 text-sm font-medium text-blue-600">
+            {role === "placement-officer"
+              ? "Placement Officer"
+              : role}{" "}
+            Portal
           </p>
 
           <h1 className="text-3xl font-bold tracking-tight text-slate-900 md:text-4xl">
@@ -220,8 +257,8 @@ function LoginPage() {
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-
           <form onSubmit={handleSubmit} className="space-y-5">
+            {/* EMAIL */}
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -243,6 +280,8 @@ function LoginPage() {
               />
             </div>
 
+            {/* PASSWORD */}
+
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 Password
@@ -263,6 +302,8 @@ function LoginPage() {
               />
             </div>
 
+            {/* FORGOT PASSWORD */}
+
             <div className="flex justify-end">
               <button
                 type="button"
@@ -273,11 +314,15 @@ function LoginPage() {
               </button>
             </div>
 
+            {/* ERROR */}
+
             {error && (
               <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                 {error}
               </div>
             )}
+
+            {/* LOGIN BUTTON */}
 
             <button
               type="submit"
@@ -286,7 +331,6 @@ function LoginPage() {
             >
               {loading ? "Signing in..." : "Sign In"}
             </button>
-
           </form>
         </div>
       </div>
