@@ -1,6 +1,9 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { supabase } from '../lib/supabase'
 
 function PlacementOfficerLayout() {
+  const navigate = useNavigate()
+
   const navItems = [
     {
       to: '/placement-officer',
@@ -16,6 +19,12 @@ function PlacementOfficerLayout() {
       label: 'Applications',
     },
   ]
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    localStorage.removeItem('userRole')
+    navigate('/')
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -54,6 +63,15 @@ function PlacementOfficerLayout() {
             </NavLink>
           ))}
 
+          {/* Logout */}
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="mt-6 w-full rounded-xl px-4 py-2.5 text-left text-sm font-medium text-red-300 transition hover:bg-red-500/10 hover:text-red-200"
+          >
+            Logout
+          </button>
+
         </nav>
 
       </aside>
@@ -71,21 +89,35 @@ function PlacementOfficerLayout() {
             </p>
           </div>
 
-          {/* Top Right - Single Profile */}
-          <div className="flex items-center gap-3">
+          {/* Top Right */}
+          <div className="flex items-center gap-4">
 
-            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-lg text-white shadow-sm">
-              👤
-            </div>
+            {/* Notification */}
+            <button
+              type="button"
+              className="flex h-10 w-10 items-center justify-center rounded-full text-xl transition hover:bg-slate-100"
+              aria-label="Notifications"
+            >
+              🔔
+            </button>
 
-            <div className="hidden text-right sm:block">
-              <p className="text-sm font-semibold text-slate-800">
-                Placement Officer
-              </p>
+            {/* Existing Single Profile */}
+            <div className="flex items-center gap-3">
 
-              <p className="text-xs text-slate-400">
-                Account
-              </p>
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-lg text-white shadow-sm">
+                👤
+              </div>
+
+              <div className="hidden text-right sm:block">
+                <p className="text-sm font-semibold text-slate-800">
+                  Placement Officer
+                </p>
+
+                <p className="text-xs text-slate-400">
+                  Account
+                </p>
+              </div>
+
             </div>
 
           </div>
