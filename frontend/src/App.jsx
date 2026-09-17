@@ -1,76 +1,174 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 
-import AdminLayout from './layouts/AdminLayout'
-import PlacementOfficerLayout from './layouts/PlacementOfficerLayout'
+// ==================== AUTH ====================
+import LoginPage from "./pages/auth/LoginPage";
+import ForgotPassword from "./pages/auth/ForgotPassword";
+import ResetPassword from "./pages/auth/ResetPassword";
 
-import AdminDashboard from './pages/admin/AdminDashboard'
-import UserManagement from './pages/admin/UserManagement'
-import SkillsAssessments from './pages/admin/SkillsAssessments'
-import Companies from './pages/admin/Companies'
+// ==================== PROTECTED ROUTE ====================
+import ProtectedRoute from "./components/ProtectedRoute";
 
-import PlacementOfficerDashboard from './pages/placement-officer/PlacementOfficerDashboard'
-import CompaniesJobs from './pages/placement-officer/CompaniesJobs'
-import Applications from './pages/placement-officer/Applications'
+// ==================== STUDENT ====================
+import StudentLayout from "./pages/student/StudentLayout";
+import StudentDashboard from "./pages/student/StudentDashboard";
+import StudentProfile from "./pages/student/StudentProfile";
+import StudentOpportunities from "./pages/student/StudentOpportunities";
+import StudentApplications from "./pages/student/StudentApplications";
+import Assessments from "./pages/student/Assessments";
+import AssessmentsAttempts from "./pages/student/AssessmentsAttempts";
+import Results from "./pages/student/Results";
+import SkillScores from "./pages/student/SkillScores";
+
+// ==================== ADMIN ====================
+import AdminLayout from "./layouts/AdminLayout";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import UserManagement from "./pages/admin/UserManagement";
+import SkillsAssessments from "./pages/admin/SkillsAssessments";
+import Companies from "./pages/admin/Companies";
+
+// ==================== PLACEMENT OFFICER ====================
+import PlacementOfficerLayout from "./layouts/PlacementOfficerLayout";
+import PlacementOfficerDashboard from "./pages/placement-officer/PlacementOfficerDashboard";
+import CompaniesJobs from "./pages/placement-officer/CompaniesJobs";
+import Applications from "./pages/placement-officer/Applications";
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
 
-        {/* ==================== ADMIN ==================== */}
+        {/* ==================== AUTH ==================== */}
 
-        <Route path="/admin" element={<AdminLayout />}>
+        <Route path="/" element={<LoginPage />} />
 
-          <Route
-            index
-            element={<AdminDashboard />}
-          />
+        <Route
+          path="/forgot-password"
+          element={<ForgotPassword />}
+        />
 
-          <Route
-            path="users"
-            element={<UserManagement />}
-          />
+        <Route
+          path="/reset-password"
+          element={<ResetPassword />}
+        />
 
-          <Route
-            path="skills-assessments"
-            element={<SkillsAssessments />}
-          />
 
-          <Route
-            path="companies"
-            element={<Companies />}
-          />
+        {/* ==================== STUDENT ==================== */}
+
+        <Route element={<ProtectedRoute role="student" />}>
+
+          <Route path="/student" element={<StudentLayout />}>
+
+            <Route
+              index
+              element={<StudentDashboard />}
+            />
+
+            <Route
+              path="profile"
+              element={<StudentProfile />}
+            />
+
+            <Route
+              path="opportunities"
+              element={<StudentOpportunities />}
+            />
+
+            <Route
+              path="applications"
+              element={<StudentApplications />}
+            />
+
+            <Route
+              path="assessments"
+              element={<Assessments />}
+            />
+
+            <Route
+              path="assessment-attempts"
+              element={<AssessmentsAttempts />}
+            />
+
+            <Route
+              path="results"
+              element={<Results />}
+            />
+
+            <Route
+              path="skill-scores"
+              element={<SkillScores />}
+            />
+
+          </Route>
 
         </Route>
 
 
-        {/* ============== PLACEMENT OFFICER ============== */}
+        {/* ==================== ADMIN ==================== */}
+
+        <Route element={<ProtectedRoute role="admin" />}>
+
+          <Route path="/admin" element={<AdminLayout />}>
+
+            <Route
+              index
+              element={<AdminDashboard />}
+            />
+
+            <Route
+              path="users"
+              element={<UserManagement />}
+            />
+
+            <Route
+              path="skills-assessments"
+              element={<SkillsAssessments />}
+            />
+
+            <Route
+              path="companies"
+              element={<Companies />}
+            />
+
+          </Route>
+
+        </Route>
+
+
+        {/* ==================== PLACEMENT OFFICER ==================== */}
 
         <Route
-          path="/placement-officer"
-          element={<PlacementOfficerLayout />}
+          element={
+            <ProtectedRoute role="placement-officer" />
+          }
         >
 
           <Route
-            index
-            element={<PlacementOfficerDashboard />}
-          />
+            path="/placement-officer"
+            element={<PlacementOfficerLayout />}
+          >
 
-          <Route
-            path="companies-jobs"
-            element={<CompaniesJobs />}
-          />
+            <Route
+              index
+              element={<PlacementOfficerDashboard />}
+            />
 
-          <Route
-            path="applications"
-            element={<Applications />}
-          />
+            <Route
+              path="companies-jobs"
+              element={<CompaniesJobs />}
+            />
+
+            <Route
+              path="applications"
+              element={<Applications />}
+            />
+
+          </Route>
 
         </Route>
 
       </Routes>
     </BrowserRouter>
-  )
+  );
 }
 
-export default App
+export default App;
