@@ -1,8 +1,12 @@
+import { useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { MdNotifications } from 'react-icons/md'
+import { FiX } from 'react-icons/fi'
 import { supabase } from '../lib/supabase'
 
 function PlacementOfficerLayout() {
   const navigate = useNavigate()
+  const [showNotifications, setShowNotifications] = useState(false)
 
   const navItems = [
     {
@@ -77,52 +81,84 @@ function PlacementOfficerLayout() {
       </aside>
 
       {/* Main Area */}
-      <div className="ml-64 min-h-screen">
+      <div className="ml-64 min-h-screen relative">
 
-        {/* Top Bar */}
-        <header className="flex h-20 items-center justify-between border-b border-slate-200 bg-white px-8">
+        {/* Notification Bell */}
+        <div className="absolute right-8 top-5 z-40">
 
-          {/* Top Left */}
-          <div>
-            <p className="text-sm font-semibold text-slate-800">
-              Placement Officer
-            </p>
-          </div>
+          <button
+            type="button"
+            onClick={() => setShowNotifications(!showNotifications)}
+            className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white shadow-sm transition hover:bg-amber-50"
+            aria-label="Notifications"
+          >
+            <MdNotifications
+              size={25}
+              className="text-amber-400"
+            />
+          </button>
 
-          {/* Top Right */}
-          <div className="flex items-center gap-4">
+          {/* Notification Panel */}
+          {showNotifications && (
+            <div className="absolute right-0 top-[4.5rem] z-50 w-80 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
 
-            {/* Notification */}
-            <button
-              type="button"
-              className="flex h-10 w-10 items-center justify-center rounded-full text-xl transition hover:bg-slate-100"
-              aria-label="Notifications"
-            >
-              🔔
-            </button>
+              {/* Notification Header */}
+              <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
 
-            {/* Existing Single Profile */}
-            <div className="flex items-center gap-3">
+                <div>
+                  <h2 className="text-base font-semibold text-slate-900">
+                    Notifications
+                  </h2>
 
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-lg text-white shadow-sm">
-                👤
+                  <p className="text-xs text-slate-400">
+                    0 new notifications
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowNotifications(false)}
+                  className="rounded-full p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                  aria-label="Close notifications"
+                >
+                  <FiX size={20} />
+                </button>
+
               </div>
 
-              <div className="hidden text-right sm:block">
-                <p className="text-sm font-semibold text-slate-800">
-                  Placement Officer
+              {/* Empty Notification State */}
+              <div className="flex flex-col items-center justify-center px-5 py-12 text-center">
+
+                <MdNotifications
+                  size={40}
+                  className="mb-5 text-amber-400"
+                />
+
+                <p className="text-base font-semibold text-slate-800">
+                  No notifications
                 </p>
 
-                <p className="text-xs text-slate-400">
-                  Account
+                <p className="mt-1 text-sm text-slate-400">
+                  You're all caught up!
                 </p>
+
+              </div>
+
+              {/* Close Button */}
+              <div className="border-t border-slate-200 px-5 py-4 text-center">
+                <button
+                  type="button"
+                  onClick={() => setShowNotifications(false)}
+                  className="text-sm font-medium text-blue-600 hover:text-blue-700"
+                >
+                  Close
+                </button>
               </div>
 
             </div>
+          )}
 
-          </div>
-
-        </header>
+        </div>
 
         {/* Page Content */}
         <main>

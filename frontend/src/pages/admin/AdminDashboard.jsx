@@ -3,7 +3,7 @@ function AdminDashboard() {
     <div className="min-h-screen bg-slate-50 p-6 md:p-8">
 
       {/* Header */}
-      <div className="mb-8 flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+      <div className="mb-8">
         <div>
           <p className="mb-2 text-sm font-medium text-blue-600">
             Admin Panel
@@ -16,23 +16,6 @@ function AdminDashboard() {
           <p className="mt-2 text-slate-500">
             Here's what's happening with your placement portal today.
           </p>
-        </div>
-
-        {/* Admin Profile */}
-        <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-xl">
-            👤
-          </div>
-
-          <div>
-            <p className="text-sm font-semibold text-slate-800">
-              Administrator
-            </p>
-
-            <p className="text-xs text-slate-500">
-              Admin Account
-            </p>
-          </div>
         </div>
       </div>
 
