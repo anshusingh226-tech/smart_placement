@@ -20,7 +20,7 @@ function CompaniesJobs() {
     <div className="min-h-screen bg-slate-50 p-6 md:p-8">
 
       {/* Header */}
-      <div className="mb-8 flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+      <div className="mb-8">
         <div>
           <p className="mb-2 text-sm font-medium text-blue-600">
             Placement Portal
@@ -33,10 +33,6 @@ function CompaniesJobs() {
           <p className="mt-2 text-slate-500">
             Manage companies and job opportunities.
           </p>
-        </div>
-
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 text-2xl shadow-sm">
-          💼
         </div>
       </div>
 
