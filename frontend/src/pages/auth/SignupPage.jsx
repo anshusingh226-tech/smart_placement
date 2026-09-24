@@ -2,171 +2,97 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
 
-function LoginPage() {
+function SignupPage() {
   const navigate = useNavigate();
 
-  const [step, setStep] = useState("landing");
   const [role, setRole] = useState(null);
 
   const [formData, setFormData] = useState({
     email: "",
     password: "",
+    confirmPassword: "",
   });
 
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     setError("");
+    setMessage("");
+
+    if (formData.password !== formData.confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      setError("Password must be at least 6 characters long.");
+      return;
+    }
+
     setLoading(true);
 
     try {
-      // 1. Sign in with Supabase Auth
-      const { data, error: loginError } =
-        await supabase.auth.signInWithPassword({
+      const { data, error: signupError } =
+        await supabase.auth.signUp({
           email: formData.email,
           password: formData.password,
+          data: {
+            role: role,
+          },
         });
 
-      if (loginError) {
-        throw loginError;
+      if (signupError) {
+        throw signupError;
       }
 
       if (!data.user) {
-        throw new Error("Login failed. User could not be found.");
+        throw new Error("Account could not be created.");
       }
 
-      // 2. Get the user's role from the profiles table
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", data.user.id)
-        .single();
+      setMessage(
+        "Account created successfully! Please check your email to confirm your account."
+      );
 
-      if (profileError) {
-        throw new Error(
-          "Your account profile could not be found. Please contact the administrator."
-        );
-      }
-
-      if (!profile?.role) {
-        throw new Error("Your account does not have a role assigned.");
-      }
-
-      const userRole = profile.role;
-
-      // 3. Save role locally
-      localStorage.setItem("userRole", userRole);
-
-      // 4. Redirect according to database role
-      if (userRole === "student") {
-        navigate("/student");
-      } else if (userRole === "admin") {
-        navigate("/admin");
-      } else if (userRole === "placement-officer") {
-        navigate("/placement-officer");
-      } else {
-        throw new Error("Invalid user role.");
-      }
+      setFormData({
+        email: "",
+        password: "",
+        confirmPassword: "",
+      });
     } catch (err) {
-      console.error("Login error:", err);
+      console.error("Signup error:", err);
 
       setError(
         err.message ||
-          "Login failed. Please check your email and password."
+          "Signup failed. Please try again."
       );
     } finally {
       setLoading(false);
     }
   };
 
-  if (step === "landing") {
-    return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center px-6 text-center">
-        <p className="mb-2 text-sm font-medium text-blue-600">
-          Smart Placement
-        </p>
-
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900 md:text-4xl mb-4">
-          Student-Admin Portal
-        </h1>
-
-        <p className="max-w-xl text-slate-500 mb-8">
-          Connect students with opportunities. Powered by AI-driven
-          matching and assessment.
-        </p>
-
-        <button
-          onClick={() => {
-            setError("");
-            setStep("role");
-          }}
-          className="rounded-xl bg-blue-600 text-white font-semibold px-8 py-3 shadow-sm hover:bg-blue-700 transition mb-16"
-        >
-          Login / Sign Up
-        </button>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl w-full">
-          <div className="rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white p-6 text-left shadow-sm">
-            <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-100 text-2xl">
-              🎯
-            </div>
-
-            <p className="font-semibold text-slate-900 mb-1">
-              Smart Matching
-            </p>
-
-            <p className="text-sm text-slate-500">
-              AI-powered job matching based on your skills and goals
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-purple-100 bg-gradient-to-br from-purple-50 to-white p-6 text-left shadow-sm">
-            <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-purple-50 text-2xl">
-              💼
-            </div>
-
-            <p className="font-semibold text-slate-900 mb-1">
-              Opportunities
-            </p>
-
-            <p className="text-sm text-slate-500">
-              Access curated job opportunities from top companies
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-green-100 bg-gradient-to-br from-green-50 to-white p-6 text-left shadow-sm">
-            <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-green-50 text-2xl">
-              🤖
-            </div>
-
-            <p className="font-semibold text-slate-900 mb-1">
-              Questions
-            </p>
-
-            <p className="text-sm text-slate-500">
-              Curated questions to prepare for interviews
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (step === "role") {
+  // ROLE SELECTION
+  if (!role) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
         <div className="w-full max-w-md text-center">
+
           <button
-            onClick={() => setStep("landing")}
+            onClick={() => navigate("/")}
             className="mb-6 text-sm font-medium text-blue-600 hover:text-blue-800"
           >
             ← Back
           </button>
 
+          <p className="mb-2 text-sm font-medium text-blue-600">
+            Smart Placement
+          </p>
+
           <h1 className="text-3xl font-bold tracking-tight text-slate-900 md:text-4xl">
-            Who's signing in? 👋
+            Create an account 👋
           </h1>
 
           <p className="mt-2 mb-8 text-slate-500">
@@ -174,11 +100,12 @@ function LoginPage() {
           </p>
 
           <div className="space-y-3">
+
+            {/* STUDENT */}
             <button
               onClick={() => {
-                setRole("student");
                 setError("");
-                setStep("form");
+                setRole("student");
               }}
               className="w-full rounded-2xl border border-slate-200 bg-white px-6 py-4 text-left shadow-sm hover:shadow-md transition"
             >
@@ -187,15 +114,15 @@ function LoginPage() {
               </p>
 
               <p className="text-sm text-slate-500">
-                Access opportunities and applications
+                Create an account to access opportunities and applications
               </p>
             </button>
 
+            {/* PLACEMENT OFFICER */}
             <button
               onClick={() => {
-                setRole("placement-officer");
                 setError("");
-                setStep("form");
+                setRole("placement-officer");
               }}
               className="w-full rounded-2xl border border-slate-200 bg-white px-6 py-4 text-left shadow-sm hover:shadow-md transition"
             >
@@ -204,15 +131,15 @@ function LoginPage() {
               </p>
 
               <p className="text-sm text-slate-500">
-                Manage companies, jobs, and applications
+                Manage companies, jobs, and student applications
               </p>
             </button>
 
+            {/* ADMIN */}
             <button
               onClick={() => {
-                setRole("admin");
                 setError("");
-                setStep("form");
+                setRole("admin");
               }}
               className="w-full rounded-2xl border border-slate-200 bg-white px-6 py-4 text-left shadow-sm hover:shadow-md transition"
             >
@@ -224,20 +151,37 @@ function LoginPage() {
                 Manage users, skills, companies, and reports
               </p>
             </button>
+
           </div>
+
+          <p className="mt-8 text-sm text-slate-500">
+            Already have an account?{" "}
+            <button
+              onClick={() => navigate("/")}
+              className="font-medium text-blue-600 hover:text-blue-800"
+            >
+              Sign in
+            </button>
+          </p>
+
         </div>
       </div>
     );
   }
 
+  // SIGNUP FORM
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+
       <div className="w-full max-w-md">
+
         <div className="mb-8 text-center">
+
           <button
             onClick={() => {
               setError("");
-              setStep("role");
+              setMessage("");
+              setRole(null);
             }}
             className="mb-4 text-sm font-medium text-blue-600 hover:text-blue-800"
           >
@@ -252,17 +196,25 @@ function LoginPage() {
           </p>
 
           <h1 className="text-3xl font-bold tracking-tight text-slate-900 md:text-4xl">
-            Welcome back 👋
+            Create your account
           </h1>
 
           <p className="mt-2 text-slate-500">
-            Sign in to your account
+            Sign up to get started
           </p>
+
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <form onSubmit={handleSubmit} className="space-y-5">
+
+          <form
+            onSubmit={handleSubmit}
+            className="space-y-5"
+          >
+
+            {/* EMAIL */}
             <div>
+
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 Email
               </label>
@@ -280,9 +232,12 @@ function LoginPage() {
                 className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="you@example.com"
               />
+
             </div>
 
+            {/* PASSWORD */}
             <div>
+
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 Password
               </label>
@@ -290,6 +245,7 @@ function LoginPage() {
               <input
                 type="password"
                 required
+                minLength={6}
                 value={formData.password}
                 onChange={(e) =>
                   setFormData({
@@ -300,36 +256,78 @@ function LoginPage() {
                 className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="••••••••"
               />
+
             </div>
 
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={() => navigate("/forgot-password")}
-                className="text-sm font-medium text-blue-600 hover:text-blue-800"
-              >
-                Forgot Password?
-              </button>
+            {/* CONFIRM PASSWORD */}
+            <div>
+
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Confirm Password
+              </label>
+
+              <input
+                type="password"
+                required
+                minLength={6}
+                value={formData.confirmPassword}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    confirmPassword: e.target.value,
+                  })
+                }
+                className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="••••••••"
+              />
+
             </div>
 
+            {/* ERROR */}
             {error && (
               <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                 {error}
               </div>
             )}
 
+            {/* SUCCESS MESSAGE */}
+            {message && (
+              <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+                {message}
+              </div>
+            )}
+
+            {/* SUBMIT */}
             <button
               type="submit"
               disabled={loading}
               className="w-full rounded-xl bg-blue-600 px-4 py-2.5 font-semibold text-white hover:bg-blue-700 transition disabled:opacity-60"
             >
-              {loading ? "Signing in..." : "Sign In"}
+              {loading
+                ? "Creating Account..."
+                : "Create Account"}
             </button>
+
           </form>
+
         </div>
+
+        <p className="mt-6 text-center text-sm text-slate-500">
+          Already have an account?{" "}
+
+          <button
+            onClick={() => navigate("/")}
+            className="font-medium text-blue-600 hover:text-blue-800"
+          >
+            Sign In
+          </button>
+
+        </p>
+
       </div>
+
     </div>
   );
 }
 
-export default LoginPage;
+export default SignupPage;

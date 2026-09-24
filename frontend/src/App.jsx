@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 // ==================== AUTH ====================
 import LoginPage from "./pages/auth/LoginPage";
+import SignupPage from "./pages/auth/SignupPage";
 import ForgotPassword from "./pages/auth/ForgotPassword";
 import ResetPassword from "./pages/auth/ResetPassword";
 
@@ -42,6 +43,11 @@ function App() {
         <Route path="/" element={<LoginPage />} />
 
         <Route
+          path="/signup"
+          element={<SignupPage />}
+        />
+
+        <Route
           path="/forgot-password"
           element={<ForgotPassword />}
         />
@@ -54,83 +60,83 @@ function App() {
 
         {/* ==================== STUDENT ==================== */}
 
-        <Route element={<ProtectedRoute role="student" />}>
+        <Route
+          element={
+            <ProtectedRoute allowedRoles={["student"]}>
+              <StudentLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route
+            path="/student"
+            element={<StudentDashboard />}
+          />
 
-          <Route path="/student" element={<StudentLayout />}>
+          <Route
+            path="/student/profile"
+            element={<StudentProfile />}
+          />
 
-            <Route
-              index
-              element={<StudentDashboard />}
-            />
+          <Route
+            path="/student/opportunities"
+            element={<StudentOpportunities />}
+          />
 
-            <Route
-              path="profile"
-              element={<StudentProfile />}
-            />
+          <Route
+            path="/student/applications"
+            element={<StudentApplications />}
+          />
 
-            <Route
-              path="opportunities"
-              element={<StudentOpportunities />}
-            />
+          <Route
+            path="/student/assessments"
+            element={<Assessments />}
+          />
 
-            <Route
-              path="applications"
-              element={<StudentApplications />}
-            />
+          <Route
+            path="/student/assessment-attempts"
+            element={<AssessmentsAttempts />}
+          />
 
-            <Route
-              path="assessments"
-              element={<Assessments />}
-            />
+          <Route
+            path="/student/results"
+            element={<Results />}
+          />
 
-            <Route
-              path="assessment-attempts"
-              element={<AssessmentsAttempts />}
-            />
-
-            <Route
-              path="results"
-              element={<Results />}
-            />
-
-            <Route
-              path="skill-scores"
-              element={<SkillScores />}
-            />
-
-          </Route>
-
+          <Route
+            path="/student/skill-scores"
+            element={<SkillScores />}
+          />
         </Route>
 
 
         {/* ==================== ADMIN ==================== */}
 
-        <Route element={<ProtectedRoute role="admin" />}>
+        <Route
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <AdminLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route
+            path="/admin"
+            element={<AdminDashboard />}
+          />
 
-          <Route path="/admin" element={<AdminLayout />}>
+          <Route
+            path="/admin/users"
+            element={<UserManagement />}
+          />
 
-            <Route
-              index
-              element={<AdminDashboard />}
-            />
+          <Route
+            path="/admin/skills-assessments"
+            element={<SkillsAssessments />}
+          />
 
-            <Route
-              path="users"
-              element={<UserManagement />}
-            />
-
-            <Route
-              path="skills-assessments"
-              element={<SkillsAssessments />}
-            />
-
-            <Route
-              path="companies"
-              element={<Companies />}
-            />
-
-          </Route>
-
+          <Route
+            path="/admin/companies"
+            element={<Companies />}
+          />
         </Route>
 
 
@@ -138,32 +144,25 @@ function App() {
 
         <Route
           element={
-            <ProtectedRoute role="placement-officer" />
+            <ProtectedRoute allowedRoles={["placement-officer"]}>
+              <PlacementOfficerLayout />
+            </ProtectedRoute>
           }
         >
-
           <Route
             path="/placement-officer"
-            element={<PlacementOfficerLayout />}
-          >
+            element={<PlacementOfficerDashboard />}
+          />
 
-            <Route
-              index
-              element={<PlacementOfficerDashboard />}
-            />
+          <Route
+            path="/placement-officer/companies-jobs"
+            element={<CompaniesJobs />}
+          />
 
-            <Route
-              path="companies-jobs"
-              element={<CompaniesJobs />}
-            />
-
-            <Route
-              path="applications"
-              element={<Applications />}
-            />
-
-          </Route>
-
+          <Route
+            path="/placement-officer/applications"
+            element={<Applications />}
+          />
         </Route>
 
       </Routes>
