@@ -6,6 +6,7 @@ require("dotenv").config();
 
 const supabase = require("./config/supabase");
 const adminRoutes = require("./routes/adminRoutes");
+const placementOfficerRoutes = require("./routes/placementOfficerRoutes");
 
 const app = express();
 
@@ -38,6 +39,9 @@ app.get("/api/health", (req, res) => {
 
 // Admin routes
 app.use("/api/admin", adminRoutes);
+
+// Placement Officer routes
+app.use("/api/placement-officer", placementOfficerRoutes);
 
 // Start server
 app.listen(PORT, () => {
