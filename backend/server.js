@@ -6,6 +6,7 @@ require("dotenv").config();
 
 const supabase = require("./config/supabase");
 const adminRoutes = require("./routes/adminRoutes");
+const studentRoutes = require("./routes/studentRoutes");
 
 const app = express();
 
@@ -38,6 +39,7 @@ app.get("/api/health", (req, res) => {
 
 // Admin routes
 app.use("/api/admin", adminRoutes);
+app.use("/api/student", studentRoutes);
 
 // Start server
 app.listen(PORT, () => {
