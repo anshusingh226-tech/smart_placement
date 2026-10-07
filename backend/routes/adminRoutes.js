@@ -138,6 +138,75 @@ async function getAllAuthUsers() {
 }
 
 /* =========================================================
+   GET ADMIN DASHBOARD STATS
+========================================================= */
+
+router.get("/dashboard", async (req, res) => {
+  try {
+    const [
+      studentsResult,
+      placementOfficersResult,
+      companiesResult,
+      skillsResult,
+      assessmentsResult,
+    ] = await Promise.all([
+      adminSupabase
+        .from("profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("role", "student"),
+
+      adminSupabase
+        .from("profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("role", "placement-officer"),
+
+      adminSupabase
+        .from("companies")
+        .select("id", { count: "exact", head: true }),
+
+      adminSupabase
+        .from("skills")
+        .select("id", { count: "exact", head: true }),
+
+      adminSupabase
+        .from("assessments")
+        .select("id", { count: "exact", head: true }),
+    ]);
+
+    const results = [
+      studentsResult,
+      placementOfficersResult,
+      companiesResult,
+      skillsResult,
+      assessmentsResult,
+    ];
+
+    const failedResult = results.find((result) => result.error);
+
+    if (failedResult) {
+      return sendError(res, failedResult.error);
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        students: studentsResult.count || 0,
+        placement_officers: placementOfficersResult.count || 0,
+        companies: companiesResult.count || 0,
+        skills: skillsResult.count || 0,
+        assessments: assessmentsResult.count || 0,
+      },
+    });
+  } catch (error) {
+    console.error("Dashboard stats error:", error);
+
+    return res.status(500).json({
+      error: "Failed to load dashboard statistics.",
+    });
+  }
+});
+
+/* =========================================================
    GET USERS
 ========================================================= */
 
