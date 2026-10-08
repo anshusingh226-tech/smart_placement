@@ -1,15 +1,23 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   FiEdit2,
   FiKey,
   FiPower,
+  FiSearch,
   FiTrash2,
   FiUserPlus,
   FiX,
 } from 'react-icons/fi'
+import { supabase } from '../../lib/supabase'
+
+const API_BASE = 'http://localhost:5000/api/admin'
 
 function UserManagement() {
   const [activeTab, setActiveTab] = useState('students')
+
+  const [users, setUsers] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   const [showUserForm, setShowUserForm] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
@@ -24,22 +32,74 @@ function UserManagement() {
   const [searchTerm, setSearchTerm] = useState('')
 
   const [userForm, setUserForm] = useState({
-    name: '',
     email: '',
-    role: 'Student',
-    status: 'Active',
+    password: '',
+    role: 'student',
   })
 
-  /*
-   * No hardcoded backend users.
-   *
-   * These arrays will later be populated from Supabase/backend.
-   */
-  const students = []
-  const officers = []
+  const [resetPassword, setResetPassword] = useState('')
 
-  const currentUsers =
-    activeTab === 'students' ? students : officers
+  /* ================= API HELPER ================= */
+
+  const apiRequest = async (endpoint, options = {}) => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    if (!session?.access_token) {
+      throw new Error('Your session has expired. Please log in again.')
+    }
+
+    const response = await fetch(`${API_BASE}${endpoint}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+        ...(options.headers || {}),
+      },
+    })
+
+    const data = await response.json().catch(() => ({}))
+
+    if (!response.ok) {
+      throw new Error(data.message || 'Something went wrong.')
+    }
+
+    return data
+  }
+
+  /* ================= LOAD USERS ================= */
+
+  const loadUsers = async () => {
+    try {
+      setLoading(true)
+      setError('')
+
+      const data = await apiRequest('/users')
+
+      setUsers(data.users || [])
+    } catch (err) {
+      console.error('Failed to load users:', err)
+      setError(err.message || 'Failed to load users.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadUsers()
+  }, [])
+
+  /* ================= FILTER USERS ================= */
+
+  const currentUsers = useMemo(() => {
+    const role =
+      activeTab === 'students'
+        ? 'student'
+        : 'placement-officer'
+
+    return users.filter((user) => user.role === role)
+  }, [users, activeTab])
 
   const filteredUsers = useMemo(() => {
     const search = searchTerm.trim().toLowerCase()
@@ -48,64 +108,94 @@ function UserManagement() {
       return currentUsers
     }
 
-    return currentUsers.filter((user) => {
-      const name = user.name?.toLowerCase() || ''
-      const email = user.email?.toLowerCase() || ''
-
-      return name.includes(search) || email.includes(search)
-    })
+    return currentUsers.filter((user) =>
+      (user.email || '').toLowerCase().includes(search)
+    )
   }, [currentUsers, searchTerm])
 
-  const inputClass =
-    'w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100'
-
-  const labelClass =
-    'mb-2 block text-sm font-medium text-slate-700'
-
-  /* ================= CREATE / EDIT USER ================= */
+  /* ================= CREATE USER ================= */
 
   const openCreateUser = () => {
     setEditingUser(null)
 
     setUserForm({
-      name: '',
       email: '',
+      password: '',
       role:
         activeTab === 'students'
-          ? 'Student'
-          : 'Placement Officer',
-      status: 'Active',
+          ? 'student'
+          : 'placement-officer',
     })
 
+    setError('')
     setShowUserForm(true)
   }
+
+  /* ================= EDIT USER ================= */
 
   const openEditUser = (user) => {
     setEditingUser(user)
 
     setUserForm({
-      name: user.name || '',
       email: user.email || '',
-      role: user.role || 'Student',
-      status: user.status || 'Active',
+      password: '',
+      role: user.role || 'student',
     })
 
+    setError('')
     setShowUserForm(true)
   }
 
   const closeUserForm = () => {
     setShowUserForm(false)
     setEditingUser(null)
+
+    setUserForm({
+      email: '',
+      password: '',
+      role: 'student',
+    })
   }
 
-  const saveUser = () => {
-    /*
-     * Backend integration will be added later.
-     *
-     * Administrator is the only role that should be able
-     * to perform this operation.
-     */
-    closeUserForm()
+  const saveUser = async () => {
+    try {
+      setError('')
+
+      if (!userForm.email.trim()) {
+        setError('Email address is required.')
+        return
+      }
+
+      if (!editingUser && userForm.password.length < 6) {
+        setError('Password must be at least 6 characters.')
+        return
+      }
+
+      if (editingUser) {
+        await apiRequest(`/users/${editingUser.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            email: userForm.email.trim(),
+            role: userForm.role,
+          }),
+        })
+      } else {
+        await apiRequest('/users', {
+          method: 'POST',
+          body: JSON.stringify({
+            email: userForm.email.trim(),
+            password: userForm.password,
+            role: userForm.role,
+          }),
+        })
+      }
+
+      closeUserForm()
+      await loadUsers()
+    } catch (err) {
+      console.error('Failed to save user:', err)
+      setError(err.message || 'Failed to save user.')
+    }
   }
 
   /* ================= DELETE USER ================= */
@@ -120,9 +210,22 @@ function UserManagement() {
     setShowDeleteModal(false)
   }
 
-  const confirmDelete = () => {
-    // Backend delete operation will be added later.
-    closeDeleteModal()
+  const confirmDelete = async () => {
+    if (!selectedUser) return
+
+    try {
+      setError('')
+
+      await apiRequest(`/users/${selectedUser.id}`, {
+        method: 'DELETE',
+      })
+
+      closeDeleteModal()
+      await loadUsers()
+    } catch (err) {
+      console.error('Failed to delete user:', err)
+      setError(err.message || 'Failed to delete user.')
+    }
   }
 
   /* ================= SUSPEND / ACTIVATE ================= */
@@ -139,75 +242,127 @@ function UserManagement() {
     setShowStatusModal(false)
   }
 
-  const confirmStatusChange = () => {
-    /*
-     * Backend status update will be added later.
-     *
-     * statusAction:
-     * - suspend
-     * - activate
-     */
-    closeStatusModal()
+  const confirmStatusChange = async () => {
+    if (!selectedUser || !statusAction) return
+
+    try {
+      setError('')
+
+      const endpoint =
+        statusAction === 'suspend'
+          ? `/users/${selectedUser.id}/suspend`
+          : `/users/${selectedUser.id}/activate`
+
+      await apiRequest(endpoint, {
+        method: 'POST',
+      })
+
+      closeStatusModal()
+      await loadUsers()
+    } catch (err) {
+      console.error('Failed to change user status:', err)
+      setError(err.message || 'Failed to change user status.')
+    }
   }
 
   /* ================= RESET PASSWORD ================= */
 
   const openResetPasswordModal = (user) => {
     setSelectedUser(user)
+    setResetPassword('')
     setShowResetPasswordModal(true)
   }
 
   const closeResetPasswordModal = () => {
     setSelectedUser(null)
+    setResetPassword('')
     setShowResetPasswordModal(false)
   }
 
-  const confirmResetPassword = () => {
-    // Backend password reset operation will be added later.
-    closeResetPasswordModal()
+  const confirmResetPassword = async () => {
+    if (!selectedUser) return
+
+    if (resetPassword.length < 6) {
+      setError('Password must be at least 6 characters.')
+      return
+    }
+
+    try {
+      setError('')
+
+      await apiRequest(
+        `/users/${selectedUser.id}/reset-password`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            password: resetPassword,
+          }),
+        }
+      )
+
+      closeResetPasswordModal()
+
+      alert('Password reset successfully.')
+    } catch (err) {
+      console.error('Failed to reset password:', err)
+      setError(err.message || 'Failed to reset password.')
+    }
+  }
+
+  /* ================= UI HELPERS ================= */
+
+  const roleLabel = (role) => {
+    if (role === 'placement-officer') {
+      return 'Placement Officer'
+    }
+
+    return 'Student'
+  }
+
+  const formatDate = (date) => {
+    if (!date) return '—'
+
+    return new Date(date).toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    })
   }
 
   return (
     <div className="min-h-screen bg-slate-50 p-6 md:p-8">
+
       {/* ================= HEADER ================= */}
 
-      <div className="mb-8 flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="mb-2 text-sm font-medium text-blue-600">
-            Admin Panel
-          </p>
+      <div className="mb-8">
+        <p className="mb-2 text-sm font-medium text-blue-600">
+          Admin Panel
+        </p>
 
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900 md:text-4xl">
-            User Management 👥
-          </h1>
+        <h1 className="text-3xl font-bold tracking-tight text-slate-900 md:text-4xl">
+          User Management
+        </h1>
 
-          <p className="mt-2 text-slate-500">
-            Manage students and placement officers.
-          </p>
-        </div>
-
-        {/* Admin-only UI action */}
-        <button
-          type="button"
-          onClick={openCreateUser}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-        >
-          <FiUserPlus size={17} />
-          Create User
-        </button>
+        <p className="mt-2 text-slate-500">
+          Manage students and placement officers.
+        </p>
       </div>
 
       {/* ================= MAIN CARD ================= */}
 
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        {/* Tabs */}
-        <div className="mb-6 border-b border-slate-200">
-          <div className="flex flex-wrap gap-8">
+
+        {/* ================= TABS ================= */}
+
+        <div className="mb-7 border-b border-slate-200">
+          <div className="flex flex-wrap gap-7">
+
             <button
               type="button"
               onClick={() => {
                 setActiveTab('students')
                 setSearchTerm('')
+                setError('')
               }}
               className={`border-b-2 pb-3 text-sm font-semibold transition ${
                 activeTab === 'students'
@@ -215,7 +370,7 @@ function UserManagement() {
                   : 'border-transparent text-slate-500 hover:text-slate-800'
               }`}
             >
-              🎓 Students
+              Students
             </button>
 
             <button
@@ -223,6 +378,7 @@ function UserManagement() {
               onClick={() => {
                 setActiveTab('officers')
                 setSearchTerm('')
+                setError('')
               }}
               className={`border-b-2 pb-3 text-sm font-semibold transition ${
                 activeTab === 'officers'
@@ -230,156 +386,161 @@ function UserManagement() {
                   : 'border-transparent text-slate-500 hover:text-slate-800'
               }`}
             >
-              🧑‍💼 Placement Officers
+              Placement Officers
             </button>
+
           </div>
         </div>
 
-        {/* ================= SEARCH ================= */}
+        {/* ================= SECTION HEADER ================= */}
+
+        <div className="mb-6">
+          <h2 className="text-xl font-bold text-slate-900">
+            {activeTab === 'students'
+              ? 'Students'
+              : 'Placement Officers'}
+          </h2>
+
+          <p className="mt-1 text-sm text-slate-500">
+            {activeTab === 'students'
+              ? 'Manage student accounts.'
+              : 'Manage placement officer accounts.'}
+          </p>
+        </div>
+
+        {/* ================= SEARCH + CREATE ================= */}
 
         <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+
           <div className="relative w-full md:max-w-md">
-            <span className="pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 text-slate-400">
-              🔍
-            </span>
+            <FiSearch
+              className="pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 text-slate-400"
+              size={18}
+            />
 
             <input
-              type="text"
+              type="search"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder={
                 activeTab === 'students'
-                  ? 'Search students...'
-                  : 'Search placement officers...'
+                  ? 'Search students by email...'
+                  : 'Search placement officers by email...'
               }
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck="false"
               className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-12 pr-4 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
             />
           </div>
 
-          <p className="text-sm text-slate-400">
-            {filteredUsers.length} user
-            {filteredUsers.length !== 1 ? 's' : ''} found
-          </p>
+          {/* ONLY CREATE USER BUTTON */}
+          <button
+            type="button"
+            onClick={openCreateUser}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+          >
+            <FiUserPlus size={17} />
+            Create User
+          </button>
+
         </div>
 
-        {/* ================= STUDENTS ================= */}
+        {/* ================= ERROR ================= */}
 
-        {activeTab === 'students' && (
-          <div className="overflow-hidden rounded-xl border border-slate-200">
-            <div className="grid grid-cols-5 bg-slate-50 px-5 py-4 text-xs font-semibold uppercase tracking-wide text-slate-400">
-              <span>Name</span>
-              <span>Email</span>
-              <span>Status</span>
-              <span>Role</span>
-              <span>Actions</span>
-            </div>
-
-            {filteredUsers.length === 0 ? (
-              <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
-                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 text-3xl">
-                  🎓
-                </div>
-
-                <h2 className="mt-4 text-lg font-semibold text-slate-800">
-                  {searchTerm
-                    ? 'No students found'
-                    : 'No students available'}
-                </h2>
-
-                <p className="mt-2 max-w-md text-sm text-slate-500">
-                  {searchTerm
-                    ? 'Try searching with a different name or email.'
-                    : 'Student records will appear here once they are loaded from the backend.'}
-                </p>
-
-                {!searchTerm && (
-                  <button
-                    type="button"
-                    onClick={openCreateUser}
-                    className="mt-5 rounded-lg bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
-                  >
-                    + Add Student
-                  </button>
-                )}
-              </div>
-            ) : (
-              filteredUsers.map((user) => (
-                <UserRow
-                  key={user.id}
-                  user={user}
-                  onEdit={openEditUser}
-                  onDelete={openDeleteModal}
-                  onStatusChange={openStatusModal}
-                  onResetPassword={openResetPasswordModal}
-                />
-              ))
-            )}
+        {error && !showUserForm && (
+          <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
           </div>
         )}
 
-        {/* ================= PLACEMENT OFFICERS ================= */}
+        {/* ================= USER TABLE ================= */}
 
-        {activeTab === 'officers' && (
-          <div className="overflow-hidden rounded-xl border border-slate-200">
-            <div className="grid grid-cols-5 bg-slate-50 px-5 py-4 text-xs font-semibold uppercase tracking-wide text-slate-400">
-              <span>Name</span>
-              <span>Email</span>
-              <span>Status</span>
-              <span>Role</span>
-              <span>Actions</span>
+        <div className="overflow-hidden rounded-xl border border-slate-200">
+
+          {/* TABLE HEADER */}
+
+          <div className="grid grid-cols-5 bg-slate-50 px-5 py-4 text-xs font-semibold uppercase tracking-wide text-slate-400">
+            <span>Email</span>
+            <span>Status</span>
+            <span>Role</span>
+            <span>Created</span>
+            <span>Actions</span>
+          </div>
+
+          {/* LOADING */}
+
+          {loading && (
+            <div className="px-5 py-12 text-center text-sm text-slate-500">
+              Loading users...
             </div>
+          )}
 
-            {filteredUsers.length === 0 ? (
-              <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
-                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-purple-50 text-3xl">
-                  🧑‍💼
-                </div>
+          {/* EMPTY */}
 
-                <h2 className="mt-4 text-lg font-semibold text-slate-800">
-                  {searchTerm
-                    ? 'No placement officers found'
-                    : 'No placement officers available'}
-                </h2>
+          {!loading && filteredUsers.length === 0 && (
+            <div className="px-5 py-14 text-center">
 
-                <p className="mt-2 max-w-md text-sm text-slate-500">
-                  {searchTerm
-                    ? 'Try searching with a different name or email.'
-                    : 'Placement officer records will appear here once they are loaded from the backend.'}
-                </p>
+              <h3 className="text-lg font-semibold text-slate-800">
+                {searchTerm
+                  ? `No ${
+                      activeTab === 'students'
+                        ? 'students'
+                        : 'placement officers'
+                    } found`
+                  : `No ${
+                      activeTab === 'students'
+                        ? 'students'
+                        : 'placement officers'
+                    } available`}
+              </h3>
 
-                {!searchTerm && (
-                  <button
-                    type="button"
-                    onClick={openCreateUser}
-                    className="mt-5 rounded-lg bg-purple-50 px-4 py-2 text-sm font-semibold text-purple-700 transition hover:bg-purple-100"
-                  >
-                    + Add Placement Officer
-                  </button>
-                )}
-              </div>
-            ) : (
-              filteredUsers.map((user) => (
-                <UserRow
-                  key={user.id}
-                  user={user}
-                  onEdit={openEditUser}
-                  onDelete={openDeleteModal}
-                  onStatusChange={openStatusModal}
-                  onResetPassword={openResetPasswordModal}
-                />
-              ))
-            )}
+              <p className="mt-2 text-sm text-slate-500">
+                {searchTerm
+                  ? 'Try searching with a different email address.'
+                  : 'Create an account using the Create User button above.'}
+              </p>
+
+            </div>
+          )}
+
+          {/* USERS */}
+
+          {!loading &&
+            filteredUsers.map((user) => (
+              <UserRow
+                key={user.id}
+                user={user}
+                roleLabel={roleLabel}
+                formatDate={formatDate}
+                onEdit={openEditUser}
+                onDelete={openDeleteModal}
+                onStatusChange={openStatusModal}
+                onResetPassword={openResetPasswordModal}
+              />
+            ))}
+        </div>
+
+        {/* RESULT COUNT */}
+
+        {!loading && (
+          <div className="mt-4 text-right text-sm text-slate-400">
+            {filteredUsers.length}{' '}
+            {filteredUsers.length === 1 ? 'user' : 'users'} found
           </div>
         )}
+
       </div>
 
-      {/* ================= CREATE / EDIT USER MODAL ================= */}
+      {/* ================= CREATE / EDIT MODAL ================= */}
 
       {showUserForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
-          <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-            {/* Header */}
-            <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-6 py-5">
+        <ModalOverlay>
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl">
+
+            <div className="flex items-start justify-between border-b border-slate-200 p-6">
+
               <div>
                 <h2 className="text-xl font-bold text-slate-900">
                   {editingUser ? 'Edit User' : 'Create User'}
@@ -396,118 +557,113 @@ function UserManagement() {
                 type="button"
                 onClick={closeUserForm}
                 className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-                aria-label="Close"
               >
                 <FiX size={20} />
               </button>
+
             </div>
 
-            {/* Body */}
-            <div className="min-h-0 flex-1 overflow-y-auto">
-              <div className="grid gap-5 p-6">
-                {/* Name */}
-                <div>
-                  <label className={labelClass}>
-                    Full Name
-                  </label>
+            <div className="space-y-5 p-6">
 
-                  <input
-                    type="text"
-                    value={userForm.name}
-                    onChange={(e) =>
-                      setUserForm({
-                        ...userForm,
-                        name: e.target.value,
-                      })
-                    }
-                    placeholder="e.g. Rahul Sharma"
-                    className={inputClass}
-                  />
+              {error && (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {error}
                 </div>
+              )}
 
-                {/* Email */}
-                <div>
-                  <label className={labelClass}>
-                    Email Address
-                  </label>
+              {/* EMAIL */}
 
-                  <input
-                    type="email"
-                    value={userForm.email}
-                    onChange={(e) =>
-                      setUserForm({
-                        ...userForm,
-                        email: e.target.value,
-                      })
-                    }
-                    placeholder="e.g. rahul@example.com"
-                    className={inputClass}
-                  />
-                </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Email Address
+                </label>
 
-                {/* Role */}
-                <div>
-                  <label className={labelClass}>
-                    Role
-                  </label>
-
-                  <select
-                    value={userForm.role}
-                    onChange={(e) =>
-                      setUserForm({
-                        ...userForm,
-                        role: e.target.value,
-                      })
-                    }
-                    className={inputClass}
-                  >
-                    <option value="Student">Student</option>
-                    <option value="Placement Officer">
-                      Placement Officer
-                    </option>
-                  </select>
-                </div>
-
-                {/* Status */}
-                <div>
-                  <label className={labelClass}>
-                    Account Status
-                  </label>
-
-                  <select
-                    value={userForm.status}
-                    onChange={(e) =>
-                      setUserForm({
-                        ...userForm,
-                        status: e.target.value,
-                      })
-                    }
-                    className={inputClass}
-                  >
-                    <option value="Active">Active</option>
-                    <option value="Inactive">Inactive</option>
-                    <option value="Suspended">Suspended</option>
-                  </select>
-                </div>
-
-                {!editingUser && (
-                  <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
-                    <p className="text-sm font-semibold text-blue-800">
-                      Administrator Account Creation
-                    </p>
-
-                    <p className="mt-1 text-xs leading-5 text-blue-600">
-                      Students and Placement Officers do not have a
-                      self-registration option. Their accounts are created
-                      by an Administrator.
-                    </p>
-                  </div>
-                )}
+                <input
+                  type="email"
+                  value={userForm.email}
+                  onChange={(e) =>
+                    setUserForm({
+                      ...userForm,
+                      email: e.target.value,
+                    })
+                  }
+                  placeholder="e.g. student@example.com"
+                  autoComplete="off"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                />
               </div>
+
+              {/* PASSWORD - CREATE ONLY */}
+
+              {!editingUser && (
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Password
+                  </label>
+
+                  <input
+                    type="password"
+                    value={userForm.password}
+                    onChange={(e) =>
+                      setUserForm({
+                        ...userForm,
+                        password: e.target.value,
+                      })
+                    }
+                    placeholder="Minimum 6 characters"
+                    autoComplete="new-password"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
+              )}
+
+              {/* ROLE */}
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Role
+                </label>
+
+                <select
+                  value={userForm.role}
+                  onChange={(e) =>
+                    setUserForm({
+                      ...userForm,
+                      role: e.target.value,
+                    })
+                  }
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                >
+                  <option value="student">
+                    Student
+                  </option>
+
+                  <option value="placement-officer">
+                    Placement Officer
+                  </option>
+                </select>
+              </div>
+
+              {/* INFO */}
+
+              {!editingUser && (
+                <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
+                  <p className="text-sm font-semibold text-blue-800">
+                    Administrator-created account
+                  </p>
+
+                  <p className="mt-1 text-xs leading-5 text-blue-600">
+                    Students and Placement Officers do not have
+                    self-registration. Their accounts are created
+                    by an Administrator.
+                  </p>
+                </div>
+              )}
+
             </div>
 
-            {/* Footer */}
-            <div className="flex shrink-0 justify-end gap-3 border-t border-slate-200 bg-white px-6 py-5">
+            <div className="flex justify-end gap-3 border-t border-slate-200 p-6">
+
               <button
                 type="button"
                 onClick={closeUserForm}
@@ -523,9 +679,11 @@ function UserManagement() {
               >
                 {editingUser ? 'Save Changes' : 'Create User'}
               </button>
+
             </div>
+
           </div>
-        </div>
+        </ModalOverlay>
       )}
 
       {/* ================= DELETE MODAL ================= */}
@@ -533,7 +691,7 @@ function UserManagement() {
       {showDeleteModal && selectedUser && (
         <ConfirmationModal
           title="Delete User?"
-          description={`Are you sure you want to permanently delete ${selectedUser.name}? This action cannot be undone.`}
+          description={`Are you sure you want to permanently delete ${selectedUser.email}? This action cannot be undone.`}
           confirmText="Delete User"
           confirmClass="bg-red-500 hover:bg-red-600"
           icon={<FiTrash2 size={21} className="text-red-500" />}
@@ -553,8 +711,8 @@ function UserManagement() {
           }
           description={
             statusAction === 'suspend'
-              ? `Are you sure you want to suspend ${selectedUser.name}? They will no longer be able to use their account while suspended.`
-              : `Are you sure you want to activate ${selectedUser.name}? Their account will become active again.`
+              ? `Are you sure you want to suspend ${selectedUser.email}? They will no longer be able to use their account while suspended.`
+              : `Are you sure you want to activate ${selectedUser.email}? Their account will become active again.`
           }
           confirmText={
             statusAction === 'suspend'
@@ -575,26 +733,89 @@ function UserManagement() {
       {/* ================= RESET PASSWORD MODAL ================= */}
 
       {showResetPasswordModal && selectedUser && (
-        <ConfirmationModal
-          title="Reset Password?"
-          description={`Are you sure you want to reset the password for ${selectedUser.name}? A password reset process will be triggered.`}
-          confirmText="Reset Password"
-          confirmClass="bg-blue-600 hover:bg-blue-700"
-          icon={<FiKey size={21} className="text-blue-500" />}
-          onCancel={closeResetPasswordModal}
-          onConfirm={confirmResetPassword}
-        />
+        <ModalOverlay>
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
+
+            <div className="flex items-start justify-between border-b border-slate-200 p-6">
+
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">
+                  Reset Password
+                </h2>
+
+                <p className="mt-1 text-sm text-slate-500">
+                  Set a new password for {selectedUser.email}.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={closeResetPasswordModal}
+                className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+              >
+                <FiX size={20} />
+              </button>
+
+            </div>
+
+            <div className="p-6">
+
+              {error && (
+                <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {error}
+                </div>
+              )}
+
+              <label className="mb-2 block text-sm font-medium text-slate-700">
+                New Password
+              </label>
+
+              <input
+                type="password"
+                value={resetPassword}
+                onChange={(e) => setResetPassword(e.target.value)}
+                placeholder="Minimum 6 characters"
+                autoComplete="new-password"
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+              />
+
+            </div>
+
+            <div className="flex justify-end gap-3 border-t border-slate-200 p-6">
+
+              <button
+                type="button"
+                onClick={closeResetPasswordModal}
+                className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={confirmResetPassword}
+                className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700"
+              >
+                <FiKey size={16} />
+                Reset Password
+              </button>
+
+            </div>
+
+          </div>
+        </ModalOverlay>
       )}
+
     </div>
   )
 }
 
-/* ============================================================
-   USER ROW
-   ============================================================ */
+/* ================= USER ROW ================= */
 
 function UserRow({
   user,
+  roleLabel,
+  formatDate,
   onEdit,
   onDelete,
   onStatusChange,
@@ -603,44 +824,47 @@ function UserRow({
   const isSuspended =
     user.status?.toLowerCase() === 'suspended'
 
-  const isActive =
-    user.status?.toLowerCase() === 'active'
-
   return (
     <div className="grid grid-cols-5 items-center border-t border-slate-100 px-5 py-4 text-sm">
-      {/* Name */}
-      <span className="font-semibold text-slate-800">
-        {user.name}
-      </span>
 
-      {/* Email */}
-      <span className="text-slate-600">
+      {/* EMAIL */}
+
+      <span className="truncate pr-4 font-medium text-slate-800">
         {user.email}
       </span>
 
-      {/* Status */}
+      {/* STATUS */}
+
       <span>
         <span
           className={`rounded-full px-3 py-1 text-xs font-semibold ${
             isSuspended
               ? 'bg-orange-50 text-orange-700'
-              : isActive
-                ? 'bg-emerald-50 text-emerald-700'
-                : 'bg-slate-100 text-slate-500'
+              : 'bg-emerald-50 text-emerald-700'
           }`}
         >
           {user.status}
         </span>
       </span>
 
-      {/* Role */}
+      {/* ROLE */}
+
       <span className="text-slate-600">
-        {user.role}
+        {roleLabel(user.role)}
       </span>
 
-      {/* Actions */}
+      {/* CREATED */}
+
+      <span className="text-slate-500">
+        {formatDate(user.created_at)}
+      </span>
+
+      {/* ACTIONS */}
+
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        {/* Edit */}
+
+        {/* EDIT */}
+
         <button
           type="button"
           onClick={() => onEdit(user)}
@@ -650,13 +874,14 @@ function UserRow({
           Edit
         </button>
 
-        <span className="text-slate-300">/</span>
+        {/* SUSPEND / ACTIVATE */}
 
-        {/* Suspend / Activate */}
         {isSuspended ? (
           <button
             type="button"
-            onClick={() => onStatusChange(user, 'activate')}
+            onClick={() =>
+              onStatusChange(user, 'activate')
+            }
             className="inline-flex items-center gap-1.5 font-medium text-emerald-600 hover:text-emerald-800"
           >
             <FiPower size={14} />
@@ -665,7 +890,9 @@ function UserRow({
         ) : (
           <button
             type="button"
-            onClick={() => onStatusChange(user, 'suspend')}
+            onClick={() =>
+              onStatusChange(user, 'suspend')
+            }
             className="inline-flex items-center gap-1.5 font-medium text-orange-600 hover:text-orange-800"
           >
             <FiPower size={14} />
@@ -673,9 +900,8 @@ function UserRow({
           </button>
         )}
 
-        <span className="text-slate-300">/</span>
+        {/* RESET PASSWORD */}
 
-        {/* Reset Password */}
         <button
           type="button"
           onClick={() => onResetPassword(user)}
@@ -685,9 +911,8 @@ function UserRow({
           Reset
         </button>
 
-        <span className="text-slate-300">/</span>
+        {/* DELETE */}
 
-        {/* Delete */}
         <button
           type="button"
           onClick={() => onDelete(user)}
@@ -696,14 +921,24 @@ function UserRow({
           <FiTrash2 size={14} />
           Delete
         </button>
+
       </div>
+
     </div>
   )
 }
 
-/* ============================================================
-   CONFIRMATION MODAL
-   ============================================================ */
+/* ================= MODAL OVERLAY ================= */
+
+function ModalOverlay({ children }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
+      {children}
+    </div>
+  )
+}
+
+/* ================= CONFIRMATION MODAL ================= */
 
 function ConfirmationModal({
   title,
@@ -715,25 +950,33 @@ function ConfirmationModal({
   onConfirm,
 }) {
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-        {/* Icon */}
-        <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-full bg-slate-50">
-          {icon}
+    <ModalOverlay>
+      <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
+
+        <div className="p-6">
+
+          <div className="flex items-start gap-4">
+
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-50">
+              {icon}
+            </div>
+
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">
+                {title}
+              </h2>
+
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+                {description}
+              </p>
+            </div>
+
+          </div>
+
         </div>
 
-        {/* Title */}
-        <h2 className="text-xl font-bold text-slate-900">
-          {title}
-        </h2>
+        <div className="flex justify-end gap-3 border-t border-slate-200 p-6">
 
-        {/* Description */}
-        <p className="mt-2 text-sm leading-6 text-slate-500">
-          {description}
-        </p>
-
-        {/* Buttons */}
-        <div className="mt-6 flex justify-end gap-3">
           <button
             type="button"
             onClick={onCancel}
@@ -749,9 +992,11 @@ function ConfirmationModal({
           >
             {confirmText}
           </button>
+
         </div>
+
       </div>
-    </div>
+    </ModalOverlay>
   )
 }
 
