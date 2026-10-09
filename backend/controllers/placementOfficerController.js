@@ -391,6 +391,10 @@ const getApplicationDetail = async (req, res) => {
     student: app.student,
   });
 
+  // Separate, tolerant read so a missing ai_breakdown column cannot break this page
+  const bd = await client.from("applications").select("ai_breakdown").eq("id", app.id).maybeSingle();
+  const aiBreakdown = bd.error ? null : bd.data?.ai_breakdown || null;
+
   const s = app.student || {};
   res.json({
     success: true,
@@ -419,6 +423,7 @@ const getApplicationDetail = async (req, res) => {
         match_percentage: app.match_percentage,
         extracted_skills: app.extracted_skills || [],
         missing_skills: app.missing_skills || [],
+        breakdown: aiBreakdown,
       },
       // Highest (official) score per attempted assessment only
       assessment_scores: scored
@@ -462,6 +467,38 @@ const updateApplicationStatus = async (req, res) => {
   res.json({ success: true, data });
 };
 
+/* Student facts the AI service needs for the eligibility part of the score:
+ * CGPA, branch, aptitude and each skill's official (stored) percentage. */
+const buildAiContext = async (client, app) => {
+  const [student, scores, skills] = await Promise.all([
+    client.from("students").select("cgpa, branch").eq("id", app.student_id).maybeSingle(),
+    client.from("student_skill_scores").select("skill_id, score").eq("student_id", app.student_id),
+    client.from("skills").select("id, name"),
+  ]);
+  const nameById = new Map((skills.data || []).map((x) => [x.id, x.name]));
+  const skill_scores = {};
+  for (const row of scores.data || []) {
+    const name = nameById.get(row.skill_id);
+    if (name && row.score != null) skill_scores[name] = Number(row.score);
+  }
+  const aptKey = Object.keys(skill_scores).find((k) => /^aptitude$/i.test(k));
+  const j = app.job || {};
+  return {
+    student: {
+      cgpa: student.data?.cgpa != null ? Number(student.data.cgpa) : null,
+      branch: student.data?.branch || null,
+      aptitude: aptKey ? skill_scores[aptKey] : null,
+      skill_scores,
+    },
+    job: {
+      min_cgpa: j.minimum_cgpa,
+      eligible_branches: j.eligible_branches || [],
+      min_aptitude: j.minimum_aptitude_percentage,
+      required_skill_percentage: j.required_skill_percentage,
+    },
+  };
+};
+
 /* POST /api/placement-officer/applications/:id/analyze
  * Sends the student's resume + the job to the AI service (FastAPI), stores
  * the match result on the application and returns it. The officer page
@@ -477,7 +514,7 @@ const analyzeApplication = async (req, res) => {
   const client = db(req);
   const { data: app, error } = await client
     .from("applications")
-    .select("id, student_id, job:jobs!inner(description, required_skills, created_by)")
+    .select("id, student_id, job:jobs!inner(description, required_skills, created_by, minimum_cgpa, eligible_branches, minimum_aptitude_percentage, required_skill_percentage)")
     .eq("id", req.params.id)
     .eq("job.created_by", req.user.id)
     .maybeSingle();
@@ -508,6 +545,7 @@ const analyzeApplication = async (req, res) => {
   form.append("file", file, resume.file_name || "resume.pdf");
   form.append("job_description", app.job.description || "");
   form.append("required_skills", JSON.stringify(app.job.required_skills || []));
+  form.append("context", JSON.stringify(await buildAiContext(client, app)));
 
   let response;
   try {
@@ -536,10 +574,25 @@ const analyzeApplication = async (req, res) => {
     extracted_skills: body.extracted_skills || [],
     missing_skills: body.missing_skills || [],
   };
-  const { error: saveErr } = await service.from("applications").update(result).eq("id", app.id);
+  // ai_breakdown comes from sql/003; if that column is not there yet, still save the rest
+  let { error: saveErr } = await service
+    .from("applications")
+    .update({ ...result, ai_breakdown: body.breakdown || null })
+    .eq("id", app.id);
+  if (saveErr) {
+    ({ error: saveErr } = await service.from("applications").update(result).eq("id", app.id));
+  }
   if (saveErr) console.error("[placement-officer] could not save AI result:", saveErr.message);
 
-  res.json({ success: true, data: { ...result, recommended_skills: body.recommended_skills || [] } });
+  res.json({
+    success: true,
+    data: {
+      ...result,
+      verified_skills: body.verified_skills || [],
+      recommended_skills: body.recommended_skills || [],
+      breakdown: body.breakdown || null,
+    },
+  });
 };
 
 module.exports = {

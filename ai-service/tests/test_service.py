@@ -101,6 +101,7 @@ def test_api_analyze_pdf():
     assert "React" in body["matched_skills"]
     assert body["missing_skills"] == ["Kubernetes"]
     assert body["breakdown"]["engine"] == "tfidf"
+    assert {c["key"] for c in body["breakdown"]["components"]} >= {"skills", "experience", "education", "similarity"}
 
 
 def test_api_rejects_bad_files():
@@ -127,3 +128,42 @@ def test_recommend_ranks_jobs():
     r = client.post("/recommend", files={"file": ("r.txt", RESUME.encode(), "text/plain")}, data={"jobs": jobs})
     assert r.status_code == 200
     assert r.json()["recommendations"][0]["id"] == "2"
+
+
+def _comp(res, key):
+    return next(c for c in res["breakdown"]["components"] if c["key"] == key)
+
+
+def test_breakdown_weights_sum_to_100_and_skip_unavailable():
+    p = parse_resume(RESUME)
+    res = analyze(RESUME, p["skills"], "Backend role", ["Java", "SQL"], p)
+    assert _comp(res, "eligibility")["score"] is None  # no student context
+    assert round(sum(c["weight"] for c in res["breakdown"]["components"]), 1) == 100.0
+
+
+def test_relevant_experience_counts_only_when_skills_match():
+    p = parse_resume(RESUME)
+    relevant = analyze(RESUME, p["skills"], "Node.js and Docker developer", ["Node.js", "Docker"], p)
+    unrelated = analyze(RESUME, p["skills"], "Kubernetes engineer", ["Kubernetes", "Terraform"], p)
+    assert _comp(relevant, "experience")["score"] > _comp(unrelated, "experience")["score"]
+
+
+def test_eligibility_uses_cgpa_branch_and_aptitude():
+    p = parse_resume(RESUME)
+    ok = {"student": {"cgpa": 8.4, "branch": "CSE", "aptitude": 80}, "job": {"min_cgpa": 7, "eligible_branches": ["CSE"], "min_aptitude": 60}}
+    bad = {"student": {"cgpa": 5.0, "branch": "ME", "aptitude": 20}, "job": ok["job"]}
+    a = analyze(RESUME, p["skills"], "Java dev", ["Java"], p, ok)
+    b = analyze(RESUME, p["skills"], "Java dev", ["Java"], p, bad)
+    assert _comp(a, "eligibility")["score"] == 100.0
+    assert _comp(b, "eligibility")["score"] < 50
+    assert a["match_percentage"] > b["match_percentage"]
+
+
+def test_assessment_verifies_skill_and_education_level():
+    p = parse_resume(RESUME)
+    assert p["highest_degree_level"] == 3
+    ctx = {"student": {"skill_scores": {"Kubernetes": 90}}, "job": {}}
+    res = analyze(RESUME, p["skills"], "", ["Kubernetes"], p, ctx)
+    assert "Kubernetes" in res["verified_skills"]
+    assert res["missing_skills"] == []
+

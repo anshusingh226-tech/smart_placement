@@ -489,6 +489,41 @@ function Applications() {
                       ))}
                     </div>
 
+                    {detail.ai_analysis.breakdown?.components?.length > 0 && (
+                      <div className="mt-4 rounded-xl bg-white p-4">
+                        <p className="text-xs font-medium text-slate-400">How the match was calculated</p>
+                        <div className="mt-3 space-y-3">
+                          {detail.ai_analysis.breakdown.components.map((c) => (
+                            <div key={c.key}>
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="font-medium text-slate-700">
+                                  {c.label}
+                                  {c.score != null && (
+                                    <span className="ml-1 font-normal text-slate-400">(weight {c.weight}%)</span>
+                                  )}
+                                </span>
+                                <span className="font-semibold text-slate-700">
+                                  {c.score != null ? `${c.score}%` : 'Not counted'}
+                                </span>
+                              </div>
+                              <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                                <div
+                                  className="h-full rounded-full bg-purple-500"
+                                  style={{ width: `${c.score ?? 0}%` }}
+                                />
+                              </div>
+                              {c.note && <p className="mt-1 text-xs text-slate-400">{c.note}</p>}
+                            </div>
+                          ))}
+                        </div>
+                        {detail.ai_analysis.verified_skills?.length > 0 && (
+                          <p className="mt-3 text-xs text-slate-500">
+                            Verified by assessment: {detail.ai_analysis.verified_skills.join(', ')}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
                     {recommended.length > 0 && (
                       <div className="mt-4 rounded-xl bg-white p-4">
                         <p className="text-xs font-medium text-slate-400">Recommended Skills</p>

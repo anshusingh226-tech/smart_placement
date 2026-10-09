@@ -69,6 +69,17 @@ def as_list(value: str) -> list[str]:
     return [p.strip() for p in value.split(",") if p.strip()]
 
 
+def as_context(value: str) -> dict:
+    """Optional JSON: {"student": {cgpa, branch, aptitude, skill_scores}, "job": {min_cgpa, ...}}."""
+    if not (value or "").strip():
+        return {}
+    try:
+        data = json.loads(value)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="`context` must be valid JSON.")
+    return data if isinstance(data, dict) else {}
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -84,10 +95,11 @@ async def analyze_resume(
     file: UploadFile = File(...),
     job_description: str = Form(""),
     required_skills: str = Form(""),
+    context: str = Form(""),
 ):
     text = await read_resume(file)
     parsed = parse_resume(text)
-    result = analyze(text, parsed["skills"], job_description, as_list(required_skills))
+    result = analyze(text, parsed["skills"], job_description, as_list(required_skills), parsed, as_context(context))
     result["parsed"] = {
         "education": parsed["education"],
         "years_of_experience": parsed["years_of_experience"],
@@ -101,16 +113,17 @@ class AnalyzeTextBody(BaseModel):
     resume_text: str = Field(min_length=30, max_length=60000)
     job_description: str = ""
     required_skills: list[str] = []
+    context: dict = {}
 
 
 @app.post("/analyze-text", dependencies=[Depends(require_key)])
 def analyze_text(body: AnalyzeTextBody):
     parsed = parse_resume(body.resume_text)
-    return analyze(body.resume_text, parsed["skills"], body.job_description, body.required_skills)
+    return analyze(body.resume_text, parsed["skills"], body.job_description, body.required_skills, parsed, body.context)
 
 
 @app.post("/recommend", dependencies=[Depends(require_key)])
-async def recommend(file: UploadFile = File(...), jobs: str = Form(...), top_n: int = Form(10)):
+async def recommend(file: UploadFile = File(...), jobs: str = Form(...), top_n: int = Form(10), context: str = Form("")):
     try:
         job_list = json.loads(jobs)
         assert isinstance(job_list, list)
@@ -120,5 +133,7 @@ async def recommend(file: UploadFile = File(...), jobs: str = Form(...), top_n: 
     parsed = parse_resume(text)
     return {
         "extracted_skills": parsed["skills"],
-        "recommendations": recommend_jobs(text, parsed["skills"], job_list[:200], max(1, min(top_n, 50))),
+        "recommendations": recommend_jobs(
+            text, parsed["skills"], job_list[:200], max(1, min(top_n, 50)), parsed, (as_context(context).get("student"))
+        ),
     }

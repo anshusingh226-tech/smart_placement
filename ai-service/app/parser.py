@@ -126,6 +126,22 @@ def estimate_years_of_experience(section: str) -> float:
     return round(total, 1)
 
 
+def degree_level(text: str) -> int:
+    """5 PhD, 4 Master's, 3 Bachelor's, 2 Diploma, 1 school, 0 unknown."""
+    t = text.lower()
+    if re.search(r"ph\.?\s?d|doctorate", t):
+        return 5
+    if re.search(r"\bm\.?\s?tech|\bm\.?\s?sc\b|\bmca\b|\bmba\b|\bm\.?\s?e\b|master|\bm\.?\s?com\b", t):
+        return 4
+    if re.search(r"\bb\.?\s?tech|\bb\.?\s?sc\b|\bbca\b|\bbba\b|\bb\.?\s?e\b|bachelor|\bb\.?\s?com\b", t):
+        return 3
+    if "diploma" in t:
+        return 2
+    if re.search(r"\bhsc\b|\bssc\b|higher secondary|secondary|class (?:x|xii|10|12)|intermediate", t):
+        return 1
+    return 0
+
+
 def parse_resume(text: str) -> dict:
     sections = split_sections(text)
     skills_section = sections.get("skills", "")
@@ -140,9 +156,11 @@ def parse_resume(text: str) -> dict:
     ][:10]
     certifications = [l for l in (_clean(x) for x in cert_block.splitlines()) if l][:15]
 
+    education = parse_education(sections.get("education", ""), text)
     return {
         "skills": extract_skills(text, skills_section),
-        "education": parse_education(sections.get("education", ""), text),
+        "education": education,
+        "highest_degree_level": max((degree_level(e["degree"]) for e in education), default=0),
         "experience": experience,
         "years_of_experience": estimate_years_of_experience(exp) if exp else 0.0,
         "projects": projects,
