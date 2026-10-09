@@ -7,6 +7,7 @@ require("dotenv").config();
 const supabase = require("./config/supabase");
 const adminRoutes = require("./routes/adminRoutes");
 const placementOfficerRoutes = require("./routes/placementOfficerRoutes");
+const studentRoutes = require("./routes/studentRoutes");
 
 const app = express();
 
@@ -39,6 +40,7 @@ app.get("/api/health", (req, res) => {
 
 // Admin routes
 app.use("/api/admin", adminRoutes);
+app.use("/api/student", studentRoutes);
 
 // Placement Officer routes
 app.use("/api/placement-officer", placementOfficerRoutes);
