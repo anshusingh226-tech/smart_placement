@@ -15,6 +15,7 @@ const {
   getApplications,
   getApplicationDetail,
   updateApplicationStatus,
+  analyzeApplication,
 } = require("../controllers/placementOfficerController");
 
 const router = express.Router();
@@ -40,6 +41,7 @@ router.delete("/jobs/:id", deleteJob);
 router.get("/applications", getApplications);
 router.get("/applications/:id", getApplicationDetail);
 router.patch("/applications/:id/status", updateApplicationStatus);
+router.post("/applications/:id/analyze", analyzeApplication);
 
 // Unexpected errors
 // eslint-disable-next-line no-unused-vars

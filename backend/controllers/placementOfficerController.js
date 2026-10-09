@@ -415,6 +415,7 @@ const getApplicationDetail = async (req, res) => {
       },
       resume: resumeOut,
       ai_analysis: {
+        ai_configured: Boolean(process.env.AI_SERVICE_URL),
         match_percentage: app.match_percentage,
         extracted_skills: app.extracted_skills || [],
         missing_skills: app.missing_skills || [],
@@ -461,6 +462,86 @@ const updateApplicationStatus = async (req, res) => {
   res.json({ success: true, data });
 };
 
+/* POST /api/placement-officer/applications/:id/analyze
+ * Sends the student's resume + the job to the AI service (FastAPI), stores
+ * the match result on the application and returns it. The officer page
+ * calls this in the background when no result exists yet.
+ * Fails soft: if the AI service is off or slow, the rest of the page works. */
+const analyzeApplication = async (req, res) => {
+  if (!requireId(req, res)) return;
+  const baseUrl = (process.env.AI_SERVICE_URL || "").replace(/\/$/, "");
+  if (!baseUrl) {
+    return res.status(503).json({ success: false, message: "AI service is not configured." });
+  }
+
+  const client = db(req);
+  const { data: app, error } = await client
+    .from("applications")
+    .select("id, student_id, job:jobs!inner(description, required_skills, created_by)")
+    .eq("id", req.params.id)
+    .eq("job.created_by", req.user.id)
+    .maybeSingle();
+  if (error) return fail(res, error);
+  if (!app) return res.status(404).json({ success: false, message: "Application not found." });
+
+  const { data: resume, error: resumeErr } = await client
+    .from("resumes")
+    .select("file_path, file_url, file_name")
+    .eq("student_id", app.student_id)
+    .order("uploaded_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (resumeErr) return fail(res, resumeErr);
+  const path = resume ? resumePath(resume) : null;
+  if (!path) {
+    return res.status(422).json({ success: false, message: "This student has not uploaded a resume." });
+  }
+
+  const service = storageClient();
+  const { data: file, error: downloadErr } = await service.storage.from(RESUME_BUCKET).download(path);
+  if (downloadErr || !file) {
+    console.error("[placement-officer] resume download failed:", downloadErr?.message);
+    return res.status(502).json({ success: false, message: "Could not read the resume file." });
+  }
+
+  const form = new FormData();
+  form.append("file", file, resume.file_name || "resume.pdf");
+  form.append("job_description", app.job.description || "");
+  form.append("required_skills", JSON.stringify(app.job.required_skills || []));
+
+  let response;
+  try {
+    response = await fetch(baseUrl + "/analyze", {
+      method: "POST",
+      headers: process.env.AI_SERVICE_KEY ? { "X-API-Key": process.env.AI_SERVICE_KEY } : {},
+      body: form,
+      signal: AbortSignal.timeout(60000), // free hosting can take a while to wake up
+    });
+  } catch (e) {
+    console.error("[placement-officer] AI service unreachable:", e.message);
+    return res.status(502).json({ success: false, message: "The AI service is not reachable right now." });
+  }
+
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const status = response.status === 422 || response.status === 415 ? 422 : 502;
+    return res.status(status).json({
+      success: false,
+      message: typeof body.detail === "string" ? body.detail : "The AI service could not analyse this resume.",
+    });
+  }
+
+  const result = {
+    match_percentage: body.match_percentage,
+    extracted_skills: body.extracted_skills || [],
+    missing_skills: body.missing_skills || [],
+  };
+  const { error: saveErr } = await service.from("applications").update(result).eq("id", app.id);
+  if (saveErr) console.error("[placement-officer] could not save AI result:", saveErr.message);
+
+  res.json({ success: true, data: { ...result, recommended_skills: body.recommended_skills || [] } });
+};
+
 module.exports = {
   getDashboard,
   getSkills,
@@ -475,4 +556,5 @@ module.exports = {
   getApplications,
   getApplicationDetail,
   updateApplicationStatus,
+  analyzeApplication,
 };

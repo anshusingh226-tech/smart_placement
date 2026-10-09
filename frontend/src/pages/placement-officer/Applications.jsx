@@ -25,6 +25,23 @@ function Section({ icon, iconBg, title, subtitle, children, className = '' }) {
   )
 }
 
+// Asks the backend to run the AI resume analysis and merges the result in.
+async function runAnalysis(id, { setDetail, setAiRunning, setAiError, setRecommended }) {
+  try {
+    setAiRunning(true)
+    setAiError('')
+    const result = await officerApi(`applications/${id}/analyze`, { method: 'POST' })
+    setDetail((d) =>
+      d && d.id === id ? { ...d, ai_analysis: { ...d.ai_analysis, ...result.data } } : d
+    )
+    setRecommended(result.data.recommended_skills || [])
+  } catch (e) {
+    setAiError(e.message)
+  } finally {
+    setAiRunning(false)
+  }
+}
+
 function Applications() {
   const [rows, setRows] = useState([])
   const [total, setTotal] = useState(0)
@@ -40,6 +57,10 @@ function Applications() {
   const [detailError, setDetailError] = useState('')
   const [newStatus, setNewStatus] = useState('')
   const [savingStatus, setSavingStatus] = useState(false)
+  const [aiRunning, setAiRunning] = useState(false)
+  const [aiError, setAiError] = useState('')
+  const [recommended, setRecommended] = useState([])
+  const aiSetters = { setDetail, setAiRunning, setAiError, setRecommended }
 
   // Load the list (search is debounced)
   useEffect(() => {
@@ -78,6 +99,12 @@ function Applications() {
         if (!active) return
         setDetail(result.data)
         setNewStatus(result.data.status)
+        setRecommended([])
+        setAiError('')
+        const ai = result.data.ai_analysis
+        if (ai.ai_configured && ai.match_percentage == null && result.data.resume?.view_url) {
+          runAnalysis(selectedId, { setDetail, setAiRunning, setAiError, setRecommended })
+        }
       } catch (e) {
         if (active) setDetailError(e.message)
       } finally {
@@ -393,16 +420,52 @@ function Applications() {
                     subtitle="Resume and job matching information"
                     className="!border-purple-100 bg-purple-50/40"
                   >
+                    {detail.ai_analysis.ai_configured && detail.resume?.view_url && (
+                      <div className="mb-4 flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => runAnalysis(selectedId, aiSetters)}
+                          disabled={aiRunning}
+                          className="rounded-lg border border-purple-200 bg-white px-3 py-1.5 text-xs font-semibold text-purple-700 transition hover:bg-purple-50 disabled:opacity-50"
+                        >
+                          {aiRunning
+                            ? 'Analysing…'
+                            : detail.ai_analysis.match_percentage != null
+                              ? 'Re-run analysis'
+                              : 'Run analysis'}
+                        </button>
+                        {aiRunning && (
+                          <span className="text-xs text-slate-500">
+                            Reading the resume — this can take up to a minute the first time.
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    {aiError && (
+                      <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">
+                        {aiError}
+                      </p>
+                    )}
+
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                       <div className="rounded-xl bg-white p-4">
                         <p className="text-xs font-medium text-slate-400">Resume Match</p>
                         <p className="mt-2 text-2xl font-bold text-purple-600">
                           {detail.ai_analysis.match_percentage != null
                             ? `${detail.ai_analysis.match_percentage}%`
-                            : '—'}
+                            : aiRunning
+                              ? '…'
+                              : '—'}
                         </p>
-                        {detail.ai_analysis.match_percentage == null && (
-                          <p className="mt-1 text-xs text-slate-400">Not analysed yet</p>
+                        {detail.ai_analysis.match_percentage == null && !aiRunning && (
+                          <p className="mt-1 text-xs text-slate-400">
+                            {!detail.ai_analysis.ai_configured
+                              ? 'AI service not set up'
+                              : !detail.resume?.view_url
+                                ? 'No resume to analyse'
+                                : 'Not analysed yet'}
+                          </p>
                         )}
                       </div>
                       {[
@@ -413,9 +476,9 @@ function Applications() {
                           <p className="text-xs font-medium text-slate-400">{label}</p>
                           {list.length ? (
                             <div className="mt-2 flex flex-wrap gap-1.5">
-                              {list.map((s) => (
-                                <span key={s} className={`rounded-full px-2.5 py-1 text-xs font-medium ${chip}`}>
-                                  {s}
+                              {list.map((sk) => (
+                                <span key={sk} className={`rounded-full px-2.5 py-1 text-xs font-medium ${chip}`}>
+                                  {sk}
                                 </span>
                               ))}
                             </div>
@@ -425,6 +488,19 @@ function Applications() {
                         </div>
                       ))}
                     </div>
+
+                    {recommended.length > 0 && (
+                      <div className="mt-4 rounded-xl bg-white p-4">
+                        <p className="text-xs font-medium text-slate-400">Recommended Skills</p>
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {recommended.map((sk) => (
+                            <span key={sk} className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
+                              {sk}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </Section>
 
                   {/* Assessment Scores */}
