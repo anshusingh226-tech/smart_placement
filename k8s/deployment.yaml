@@ -17,3 +17,6 @@ spec:
           image: anshu226/smart-backend:latest
           ports:
             - containerPort: 5000
+          envFrom:
+            - secretRef:
+                name: backend-env
