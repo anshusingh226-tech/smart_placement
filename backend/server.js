@@ -44,7 +44,7 @@ app.use("/api", limiter);
 app.get("/api/health", (req, res) => {
   res.json({
     success: true,
-    message: "Backend server is running",
+    message: "Backend server is running - version 2",
   });
 });
 
